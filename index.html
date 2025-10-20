@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ESP32 Web Flasher Demo</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 Web Flasher 🔥</title>
+  <script src="https://unpkg.com/esptool-js@0.6.0/bundle.js"></script>
   <style>
     body {
       font-family: system-ui, sans-serif;
-      background: #f9fafb;
+      background: #f8fafc;
       color: #111;
       display: flex;
       flex-direction: column;
@@ -16,18 +17,17 @@
       min-height: 100vh;
       padding: 2rem;
     }
-    h1 {
-      font-size: 1.8rem;
-      color: #2563eb;
-    }
     .card {
       background: white;
       padding: 2rem;
       border-radius: 1rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
       width: 100%;
-      max-width: 420px;
+      max-width: 480px;
       text-align: center;
+    }
+    h1 {
+      color: #2563eb;
     }
     input[type="file"] {
       margin: 1rem 0;
@@ -36,77 +36,100 @@
       background: #2563eb;
       color: white;
       border: none;
-      padding: 0.75rem 1.5rem;
+      padding: 0.8rem 1.5rem;
       border-radius: 0.5rem;
       cursor: pointer;
       font-size: 1rem;
+      margin-top: 0.5rem;
       transition: background 0.2s;
     }
     button:hover {
       background: #1d4ed8;
     }
     #log {
-      margin-top: 1.2rem;
       background: #f3f4f6;
       padding: 1rem;
       border-radius: 0.5rem;
+      margin-top: 1rem;
       font-family: monospace;
       font-size: 0.9rem;
       text-align: left;
-      max-height: 180px;
+      max-height: 200px;
       overflow-y: auto;
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>ESP32 Web Flasher Demo</h1>
-    <p>Chọn file firmware (.bin) và kết nối ESP32 qua USB</p>
+    <h1>⚡ ESP32 Web Flasher</h1>
+    <p>Chọn file <code>.bin</code> và nhấn "Connect" để nạp firmware.</p>
 
     <input type="file" id="binFile" accept=".bin" />
-    <button id="connectBtn">🔌 Connect & Flash</button>
+    <button id="connectBtn">🔌 Connect</button>
+    <button id="flashBtn" disabled>🚀 Flash Firmware</button>
 
-    <div id="log">Waiting...</div>
+    <div id="log">Chờ thao tác...</div>
   </div>
 
   <script>
+    let port;
+    let esptool;
+    let fileData;
+
     const logBox = document.getElementById("log");
     const connectBtn = document.getElementById("connectBtn");
-    const binFileInput = document.getElementById("binFile");
+    const flashBtn = document.getElementById("flashBtn");
+    const binFile = document.getElementById("binFile");
 
     const log = (msg) => {
       logBox.textContent += `\n${msg}`;
       logBox.scrollTop = logBox.scrollHeight;
+      console.log(msg);
     };
 
-    async function connectAndFlash() {
+    // Kết nối cổng serial
+    connectBtn.addEventListener("click", async () => {
       try {
-        const file = binFileInput.files[0];
-        if (!file) {
-          alert("Vui lòng chọn file .bin trước!");
-          return;
-        }
-
-        log("🔌 Yêu cầu kết nối tới ESP32...");
-        const port = await navigator.serial.requestPort();
+        log("🔌 Yêu cầu quyền truy cập Serial...");
+        port = await navigator.serial.requestPort();
         await port.open({ baudRate: 115200 });
 
-        const writer = port.writable.getWriter();
-        const data = new Uint8Array(await file.arrayBuffer());
-
-        log(`📦 Gửi ${data.length} bytes...`);
-        await writer.write(data);
-        log("✅ Gửi xong! (Demo chỉ gửi data, chưa thực sự flash ROM)");
-
-        writer.releaseLock();
-        await port.close();
-        log("🔒 Đóng cổng serial.");
+        esptool = new ESPLoader(port, 115200);
+        log("🔍 Đang sync với ESP32...");
+        await esptool.initialize();
+        log("✅ Kết nối thành công ESP32!");
+        flashBtn.disabled = false;
       } catch (err) {
-        log("❌ Lỗi: " + err);
+        log("❌ Lỗi khi kết nối: " + err);
       }
-    }
+    });
 
-    connectBtn.addEventListener("click", connectAndFlash);
+    // Đọc file .bin
+    binFile.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        fileData = new Uint8Array(await file.arrayBuffer());
+        log(`📁 File: ${file.name} (${fileData.length} bytes)`);
+      }
+    });
+
+    // Flash firmware
+    flashBtn.addEventListener("click", async () => {
+      if (!fileData || !esptool) {
+        alert("Hãy chọn file .bin và kết nối ESP32 trước!");
+        return;
+      }
+
+      try {
+        log("⚙️ Bắt đầu ghi flash...");
+        await esptool.flashData(fileData);
+        log("✅ Flash hoàn tất!");
+        await esptool.hardReset();
+        log("🔁 ESP32 đã khởi động lại!");
+      } catch (err) {
+        log("❌ Lỗi khi flash: " + err);
+      }
+    });
   </script>
 </body>
 </html>
